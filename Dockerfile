@@ -18,4 +18,4 @@ COPY --from=assets /app/public/build public/build
 RUN composer install --no-dev --optimize-autoloader --no-scripts \
  && chown -R www-data:www-data storage bootstrap/cache
 EXPOSE 80
-CCMD ["sh", "-c", "php artisan package:discover --ansi && php artisan migrate --force && apache2-foreground"]
+CMD ["sh", "-c", "php artisan package:discover --ansi && php artisan migrate --force && apache2-foreground"]
