@@ -1,11 +1,21 @@
-FROM tangramor/nginx-php8-fpm:php8.3.6_node22.1.0
+FROM node:20 AS assets
+WORKDIR /app
+COPY . .
+RUN npm ci && npm run build
 
-COPY . /var/www/html
-
-ENV WEBROOT="/var/www/html/public"
-ENV CREATE_LARAVEL_STORAGE="1"
-
-RUN cd /var/www/html \
-    && composer install --no-dev --optimize-autoloader \
-    && npm ci && npm run build \
-    && chown -Rf nginx.nginx /var/www/html
+FROM php:8.3-apache
+RUN apt-get update && apt-get install -y \
+    libpq-dev libzip-dev libpng-dev libjpeg-dev libfreetype6-dev libicu-dev libonig-dev unzip git \
+ && docker-php-ext-configure gd --with-freetype --with-jpeg \
+ && docker-php-ext-install pdo pdo_mysql pdo_pgsql zip gd intl bcmath exif mbstring \
+ && a2enmod rewrite
+ENV APACHE_DOCUMENT_ROOT=/var/www/html/public
+RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+WORKDIR /var/www/html
+COPY . .
+COPY --from=assets /app/public/build public/build
+RUN composer install --no-dev --optimize-autoloader --no-scripts \
+ && chown -R www-data:www-data storage bootstrap/cache
+EXPOSE 80
+CMD ["sh", "-c", "php artisan package:discover --ansi && php artisan migrate --force && apache2-foreground"]
