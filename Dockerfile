@@ -4,8 +4,10 @@ COPY . .
 RUN npm ci && npm run build
 
 FROM php:8.3-apache
-RUN apt-get update && apt-get install -y libpq-dev libzip-dev unzip git \
- && docker-php-ext-install pdo pdo_mysql pdo_pgsql zip \
+RUN apt-get update && apt-get install -y \
+    libpq-dev libzip-dev libpng-dev libjpeg-dev libfreetype6-dev libicu-dev libonig-dev unzip git \
+ && docker-php-ext-configure gd --with-freetype --with-jpeg \
+ && docker-php-ext-install pdo pdo_mysql pdo_pgsql zip gd intl bcmath exif mbstring \
  && a2enmod rewrite
 ENV APACHE_DOCUMENT_ROOT=/var/www/html/public
 RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf
@@ -13,7 +15,7 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 WORKDIR /var/www/html
 COPY . .
 COPY --from=assets /app/public/build public/build
-RUN composer install --no-dev --optimize-autoloader \
+RUN composer install --no-dev --optimize-autoloader --no-scripts \
  && chown -R www-data:www-data storage bootstrap/cache
 EXPOSE 80
-CMD ["sh", "-c", "php artisan migrate --force && apache2-foreground"]
+CCMD ["sh", "-c", "php artisan package:discover --ansi && php artisan migrate --force && apache2-foreground"]
